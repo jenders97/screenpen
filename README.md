@@ -1,24 +1,4 @@
-<p align="center">
-    <img src="https://github.com/rsusik/screenpen/raw/master/screenpen.png" alt="ScreenPen" />
-</p>
-<p align="center">
-    <em>Multiplatform screen annotation software that allows drawing directly on the screen.</em>
-</p>
-<p align="center">
-<a href="https://pypi.org/project/screenpen" target="_blank">
-    <img src="https://img.shields.io/pypi/v/screenpen?color=%2334D058&label=pypi%20package" alt="Package version">
-</a>
-<a href="https://github.com/rsusik/screenpen/blob/master/LICENSE" target="_blank">
-    <img src="https://img.shields.io/github/license/rsusik/screenpen" alt="License">
-</a>
-<a href="https://pepy.tech/project/screenpen" target="_blank">
-    <img src="https://static.pepy.tech/personalized-badge/screenpen?period=total&units=international_system&left_color=grey&right_color=brightgreen&left_text=Downloads" alt="Number of downloads">
-</a>
-<a href="https://pepy.tech/project/screenpen" target="_blank">
-    <img src="https://static.pepy.tech/personalized-badge/screenpen?period=month&units=international_system&left_color=grey&right_color=brightgreen&left_text=Downloads/month">
-</a>
-</p>
-
+## Screenpen 2 or something IDK
 
 ## Description
 
@@ -36,31 +16,11 @@ The behavior of the program depends on the Window System you use:
 * if not then the screenshot is taken, and the user draws on the captured image (you see a static image of the screen),
 * sometimes your WM may be detected as not supporting "live transparency". In that case try running with `-t` parameter to force it._
 
-
-### Demo (video)
-
-https://user-images.githubusercontent.com/19404835/130215780-705e4eb9-330b-4a91-bd1f-b9ec3843556e.mp4
-
-
 *Note: The app is created ad-hoc only for my use case. It may contain bugs...*
-
 
 ## Usage
 
 ### Installation and execution
-
-Tu run the program you need to have Python installed and execute following:
-
-```bash
-pip install screenpen
-screenpen                # or python -m screenpen
-```
-
-**NOTE: Your WM may be detected as not supporting "live transparency". In that case try running with `-t` parameter:**
-
-```bash
-screenpen -t
-```
 
 ### Controls
 * Left mouse button - drawing.
@@ -69,6 +29,7 @@ screenpen -t
     * `Ctrl+Z` - undo,
     * `Ctrl+Y` - redo,
     * hold `Shift` - change mouse cursor icon to arrrow.
+    * and much, much, more
 
 
 ### Configuration
@@ -102,18 +63,9 @@ drawing_history = 500
 - [ ] Add ellipse shape.
 - [ ] Keyboard shortcuts for changing colors.
 
-### Compatilibity notes
-
-Screenpen (from 0.2 version) is compatible with PyQt5 and PyQt6, nevertheless the PyQt5 is currently in the requirements and recommended.
-It is possible to run it using PyQt6 by running:
-```
-pip install matplotlib>=3.2 numpy>=1.8 PyQt6
-pip install screenpen --no-deps
-```
-
 ### Wayland support
 
 Screenpen works in some Wayland compositors, but it is not perfect.
 There are issues with windows positioning and transparency.
 In case the window opens on wrong monitor (which I noticed on Sway WM) you can move it using `Win+Shift+Arrows` (or `Alt+Shift+Arrows`) shortcuts to a desired monitor.
-I have no plans to fix it in near future, but I will accept PRs.
+Please let me know if you run into any issues. I have good luck with it on KDE wayland
