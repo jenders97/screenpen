@@ -1153,48 +1153,6 @@ def _is_transparency_supported():
         print(warn)
         return False
 
-
-def show_screen_selection(screens: list[tuple[QScreen, QRect, QPixmap]]):
-    number_of_screens = len(screens)
-    def _getScreenButton(pixmap: QPixmap, label: str):
-        btn = QPushButton()
-        ico = QIcon(pixmap)
-        btn.setIcon(ico)
-        btn.setIconSize(QSize(int(160), int(160//(pixmap.rect().width()/pixmap.rect().height()))))
-
-        shad = QGraphicsDropShadowEffect()
-        shad.setOffset(-10, 10)
-        shad.setColor(COLORS['black'])
-
-        lay = QVBoxLayout(btn)
-        lbl = QLabel()
-        lbl.setContentsMargins(0, 0, 0, 0)
-        lbl.setStyleSheet("""color : white; font-weight:1000;""")
-        lbl.setText(label)
-        lbl.setGraphicsEffect(shad)
-        lay.addWidget(lbl, alignment=ALIGNMENT['center'])
-        return btn
-
-    dlg = QDialog()
-    dlg.layout = QGridLayout()
-    dlg.layout.addWidget(QLabel('Select the screen') , 0, 0, 1, number_of_screens, alignment=ALIGNMENT['center'])
-
-    def _getBtnAction(idx: int):
-        def act():
-            dlg.done(idx)
-        return act
-
-    for idx, scr in enumerate(screens):
-        screen, screen_geom, screen_pixmap = scr
-        print(screen_pixmap)
-        label = f'Screen {idx+1}' if idx > 0 else 'Main screen'
-        btn = _getScreenButton(screen_pixmap, label)
-        btn.released.connect(_getBtnAction(idx+1))
-        dlg.layout.addWidget(btn, 1, idx)
-
-    dlg.setLayout(dlg.layout)
-    return _execute_dialog(dlg)
-
 def _setPalette(app: QApplication):
     palette = _create_palette()
     _set_palette_color(palette, PALETTE_PROPS['window'], _get_color_from_RGB(53, 53, 53))
@@ -1231,26 +1189,12 @@ def main():
     app = QApplication(sys.argv)
     _setPalette(app)
 
-    number_of_screens = len(app.screens())
-
     screens_data = _get_screens(app)
 
     if args.screen is None:
         screen_choice: int = 0
     else:
-        if args.screen == 0:
-                print('No screen chosen, exiting.')
-                sys.exit(0)
-        else:
-            screen_choice: int = args.screen - 1
-    
-    # if number_of_screens > 1:
-    #     args.screen = show_screen_selection(screens_data)
-    #     if screen_choice == 0 or screen_choice is None:
-    #         print('No screen chosen, exiting.')
-    #         sys.exit(0)
-    #     else:
-    #         screen_choice -= 1
+        screen_choice = args.screen
         
     if screen_choice >= len(screens_data):
         raise Exception(f'Error: You don\'t have so many screens ({screen_choice + 1}). Try lower number.')
@@ -1291,8 +1235,6 @@ class DrawingHistory():
             
         def extend(self, l: Iterable[QPixmap]):
             self.history.extend(l)
-            # for el in l:
-                # self.append(el)
             
         def undo(self) -> QPixmap:
             if self.current > 0:
