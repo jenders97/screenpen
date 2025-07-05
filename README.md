@@ -2,6 +2,8 @@
 
 ## Description
 
+This is a fork of Robert Susik's [Screenpen](https://github.com/rsusik/screenpen) that I modified to match what I wanted more.
+
 Screen annotation software which allows drawing directly on the screen. 
 It is an open source and multiplatform 
 (all systems that support Python) 
