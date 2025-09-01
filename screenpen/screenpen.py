@@ -11,13 +11,14 @@
 import subprocess
 import sys
 import os
-from collections.abc import Iterable
-from typing import Callable
-from datetime import datetime
-
 import configparser
-from itertools import groupby
+import platform
 
+from xml.dom import minidom
+from collections.abc import Iterable
+from typing import Callable, override
+from datetime import datetime
+from itertools import groupby
 
 # Setting up Qt resources
 
@@ -33,16 +34,13 @@ from PyQt6.QtGui import (
 )
 
 from PyQt6.QtWidgets import (
-    QDialogButtonBox, QLabel, QPushButton, QVBoxLayout, QPlainTextEdit,
-    QListWidget, QListWidgetItem, QHBoxLayout, QGridLayout, QToolBar, 
+    QMainWindow, QApplication, QDialogButtonBox, QLabel, QPushButton, QVBoxLayout, 
+    QPlainTextEdit, QListWidget, QListWidgetItem, QHBoxLayout, QGridLayout, QToolBar, 
     QDialog, QToolButton, QMenu, QColorDialog, QGraphicsDropShadowEffect
 )
 
 type Color = QColor | Qt.GlobalColor | int
 
-
-def _create_palette():
-    return QPalette()
 
 PALETTE_PROPS = {
     'window': 'window',
@@ -63,6 +61,7 @@ PALETTE_PROPS = {
 
 def _get_color_from_RGB(r: int, g: int, b: int)-> QColor:
     return QColor(r, g, b)
+
 
 def _set_palette_color(palette: QPalette , property: str, value: Color):
     getattr(palette, property)().setColor(value)
@@ -182,9 +181,7 @@ DIALOG_BUTTONS = {
         
 
 # import numpy as np
-import platform
-from xml.dom import minidom
-from types import SimpleNamespace
+
 # import importlib
 
 #from matplotlib.backends.qt_compat import QtCore,#QtCore, QtWidgets
@@ -213,67 +210,19 @@ class ScreenPenWindow(QMainWindow):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         # PATHS
         try:
-            prefix = sys._MEIPASS
-            resources_xml_path = os.path.join(prefix, 'utils/resources.xml')
-        except Exception:
+            prefix: str = sys._MEIPASS
+            resources_xml_path = os.path.join(prefix, 'utils', 'resources.xml')
+        except:
             prefix = ''
-            resources_xml_path = f'{dir_path}/utils/resources.xml'
+            resources_xml_path = os.path.join(dir_path, 'utils', 'resources.xml')
 
-        default_config_path = os.path.join(os.environ["XDG_CONFIG_HOME"], "screenpenrc")
+        self.resources_xml: str = resources_xml_path
 
-        if config_file is not None:
-            config_ini_path = config_file
-
-        elif os.path.exists(default_config_path):
-            config_ini_path = default_config_path
+        self.config: Configuration = Configuration(config_file)
         
-        else:
-            from shutil import copyfile
-            from shutil import SameFileError, SpecialFileError
-            packaged_conf_path = os.path.join(dir_path, r"utils", r"screenpenrc")
-            try:
-                _ = copyfile(packaged_conf_path, default_config_path, follow_symlinks=False)
-                print(f"Added default config file to {default_config_path}.")
-                config_ini_path = default_config_path
-            
-            except (SameFileError, SpecialFileError, FileNotFoundError):
-                print("Using default configuration.")
-                config_ini_path = packaged_conf_path
 
-
-        config = configparser.ConfigParser()
-        _ = config.read(config_ini_path)
-
-        hidden_menus   = config['screenpen'].getboolean('hidden_menus')
-        if hidden_menus is None:
-            hidden_menus = False
-
-        icon_size      = config['screenpen'].getint('icon_size')
-        if icon_size is None:
-            icon_size = 50
-
-        temp_penbar = config['screenpen'].get('penbar_area')
-        if temp_penbar is None:
-            temp_penbar = "topToolBarArea"
         
-        temp_boardbar = config['screenpen'].get('boardbar_area')
-        if temp_boardbar is None:
-            temp_boardbar = "topToolBarArea"
-                
-        temp_actionbar = config['screenpen'].get('actionbar_area')
-        if temp_actionbar is None:
-            temp_actionbar = "leftToolBarArea"
-
-        penbar_area = TOOLBAR_AREAS[temp_penbar]
-        boardbar_area = TOOLBAR_AREAS[temp_boardbar]
-        actionbar_area = TOOLBAR_AREAS[temp_actionbar]
-
-        self.files: SimpleNamespace = SimpleNamespace(
-            resources_xml = resources_xml_path
-        )
-        
-        self.setScreen(screen)
-        #self.screen = screen
+        #self.setScreen(screen)# self.screen = screen
         if pixmap is not None:
             self.screen_pixmap: QPixmap = pixmap
         else:
@@ -281,22 +230,23 @@ class ScreenPenWindow(QMainWindow):
 
         self.screen_geom: QRect = screen_geom
         self.transparent_background: bool = transparent_background
-        self.hidden_menus: bool = hidden_menus
-        self.icon_size: int = icon_size
-        self.penbar_area: Qt.ToolBarArea = penbar_area
-        self.boardbar_area: Qt.ToolBarArea = boardbar_area
-        self.actionbar_area: Qt.ToolBarArea = actionbar_area
+        self.hidden_menus: bool = bool(self.config["hidden_menus"])
+        self.icon_size: int = int(self.config["icon_size"])
+        self.penbar_area: Qt.ToolBarArea = TOOLBAR_AREAS[str(self.config["penbar_area"])]
+        self.boardbar_area: Qt.ToolBarArea = TOOLBAR_AREAS[str(self.config["boardbar_area"])]
+        self.actionbar_area: Qt.ToolBarArea = TOOLBAR_AREAS[str(self.config["actionbar_area"])]
 
         if self.transparent_background:
             self.setAttribute(WINDOW_ATTRS['translucentBackground'])
-        self.move(screen_geom.topLeft())
+        # self.move(screen_geom.topLeft())
         self.setGeometry(screen_geom)
         self.activateWindow()
         self.showFullScreen()
         self._createCanvas()
         self._clearCanvas()
         
-        self.history: DrawingHistory = DrawingHistory(30)
+        
+        self.history: DrawingHistory = DrawingHistory(int(self.config["drawing_history"]))
         self.history.append(self.screen_pixmap)
 
         self.begin: QPoint = QPoint()
@@ -309,7 +259,7 @@ class ScreenPenWindow(QMainWindow):
         self.curr_style: Qt.PenStyle = PEN_STYLES['solidLine']
         self.curr_capstyle: Qt.PenCapStyle = PEN_CAP_STYLES['roundCap']
         self.curr_joinstyle: Qt.PenJoinStyle = PEN_JOIN_STYLES['roundJoin']
-        self.curr_width: int = 3
+        self.curr_width: int = int(self.config["default_pen_size"])
         self.curr_br: QtGui.QBrush = QtGui.QBrush(self.curr_color)
         self.curr_pen: QtGui.QPen = QtGui.QPen()
 
@@ -320,29 +270,29 @@ class ScreenPenWindow(QMainWindow):
         self.highlight_alpha: int = 128
         self._setupTools()
         self._setupIcons()
-        # self._setupCodes()
         self._createToolBars()
         if self.hidden_menus:
             self.hide_menus()
 
-        self.sc_undo: QShortcut = QShortcut(QKeySequence('Ctrl+Z'), self)
+        self.sc_undo: QShortcut = QShortcut(QKeySequence(str(self.config["undo_key"])), self)
         _ = self.sc_undo.activated.connect(self.undo)
-        self.sc_redo: QShortcut = QShortcut(QKeySequence('Ctrl+Y'), self)
+        self.sc_redo: QShortcut = QShortcut(QKeySequence(str(self.config["redo_key"])), self)
         _ = self.sc_redo.activated.connect(self.redo)
-        self.sc_toggle_menus: QShortcut = QShortcut(QKeySequence('Ctrl+1'), self)
+        self.sc_toggle_menus: QShortcut = QShortcut(QKeySequence(str(self.config["toggle_menus_key"])), self)
         _ = self.sc_toggle_menus.activated.connect(self.toggle_menus)
-        self.sc_quit_program: QShortcut = QShortcut(QKeySequence('Escape'), self)
+        self.sc_quit_program: QShortcut = QShortcut(QKeySequence(str(self.config["exit_shortcut_key"])), self)
         _ = self.sc_quit_program.activated.connect(self.quit_program)
-        self.sc_clear_drawings: QShortcut = QShortcut(QKeySequence('Ctrl+x'), self)
+        self.sc_clear_drawings: QShortcut = QShortcut(QKeySequence(str(self.config["clear_key"])), self)
         _ = self.sc_clear_drawings.activated.connect(self.removeDrawing())
-        self.sc_save_drawing: QShortcut = QShortcut(QKeySequence('Ctrl+s'), self)
+        self.sc_save_drawing: QShortcut = QShortcut(QKeySequence(str(self.config["save_key"])), self)
         _ = self.sc_save_drawing.activated.connect(self.saveDrawing())
-        self.sc_decrease_width: QShortcut = QShortcut(QKeySequence('Ctrl+['), self)
+        self.sc_decrease_width: QShortcut = QShortcut(QKeySequence(str(self.config["decrease_width"])), self)
         _ = self.sc_decrease_width.activated.connect(self.decreaseWidth())
-        self.sc_increase_width: QShortcut = QShortcut(QKeySequence('Ctrl+]'), self)
+        self.sc_increase_width: QShortcut = QShortcut(QKeySequence(str("]")), self) #self.config["increase_width"])), self)
         _ = self.sc_increase_width.activated.connect(self.increaseWidth())
-        self.sc_highlight: QShortcut = QShortcut(QKeySequence('Ctrl+h'), self)
+        self.sc_highlight: QShortcut = QShortcut(QKeySequence(str(self.config["highlight_key"])), self)
         _ = self.sc_highlight.activated.connect(self.setHighlight())
+
 
     def _setCursor(self, cursor: str | Qt.CursorShape | QPixmap, hotx: int | None = None, hoty: int | None = None):
         if hotx is None:
@@ -351,7 +301,7 @@ class ScreenPenWindow(QMainWindow):
             hoty = 2
         if type(cursor) == str:
             temp = self._applySvgConfig(self._icons[cursor], None)
-            pixm = QtGui.QPixmap.fromImage(QtGui.QImage.fromData(bytes(temp, encoding='utf-8')))
+            pixm = QPixmap.fromImage(QtGui.QImage.fromData(bytes(temp, encoding='utf-8')))
             pixm = pixm.scaled(QSize(32, 32))
             self.setCursor(QCursor(pixm, int(hotx), int(hoty)))
         elif type(cursor) == Qt.CursorShape:
@@ -359,35 +309,40 @@ class ScreenPenWindow(QMainWindow):
         elif type(cursor) == QPixmap:
             self.setCursor(QCursor(cursor, int(hotx), int(hoty)))
 
-    def keyPressEvent(self, a0: QKeyEvent | None):
-        if a0 is not None:
-            event = a0
-        else:
-            raise Exception("Invalid mouse event")
-            
-        if event.isAutoRepeat():
-            return
-        k = event.key()
-        if (k==KEYS['shift']):
-            self._setCursor('arrow2')
 
-    def keyReleaseEvent(self, a0: QKeyEvent | None):
-        if a0 is not None:
-            event = a0
-        else:
-            raise Exception("Invalid mouse event")
+    # @override
+    # def keyPressEvent(self, a0: QKeyEvent | None):
+    #     if a0 is not None:
+    #         event = a0
+    #     else:
+    #         raise Exception("Invalid key event")
             
-        if event.isAutoRepeat():
-            return
-        k = event.key()
-        if (k==KEYS['shift']):
-            self._setCursor(cursor=Qt.CursorShape.ArrowCursor)
+    #     if event.isAutoRepeat():
+    #         return
+    #     k = event.key()
+    #     if (k==KEYS['shift']):
+    #         self._setCursor('arrow2')
+
+
+    # @override
+    # def keyReleaseEvent(self, a0: QKeyEvent | None):
+    #     if a0 is not None:
+    #         event = a0
+    #     else:
+    #         raise Exception("Invalid key event")
+            
+    #     if event.isAutoRepeat():
+    #         return
+    #     k = event.key()
+    #     if (k==KEYS['shift']):
+    #         self._setCursor(cursor=Qt.CursorShape.ArrowCursor)
+
 
     def _setupIcons(self):
         self._icons: dict[str, str] = {}
 
         try:
-            DOMTree = minidom.parse(self.files.resources_xml)
+            DOMTree = minidom.parse(self.resources_xml)
             icons = DOMTree.getElementsByTagName('icon')
 
             if len(icons) < 1:
@@ -403,27 +358,6 @@ class ScreenPenWindow(QMainWindow):
             print('ERROR: There is no resources.xml file')
             raise ex
 
-    # class Code(object): pass
-    # def _setupCodes(self):
-    #     self._codes = []
-    #     try:
-    #         DOMTree = minidom.parse(self.files.resources_xml)
-    #         codes = DOMTree.getElementsByTagName('code')
-    #         if len(codes) < 1:
-    #             raise Exception('ERROR: there are no codes in resources.xml file')
-    #         for code in codes:
-    #             if code.getAttribute('name')=='':
-    #                 raise Exception('ERROR: resources.xml: code doesnt contain "name" attribute')
-    #             codeobj = self.Code()
-    #             codeobj.name = code.getAttribute('name')
-    #             codeobj.label = code.getAttribute('name')
-    #             codeobj.code = code.firstChild.data
-    #             self._codes += [codeobj]
-    #     except FileNotFoundError as ex:
-    #         print('ERROR: There is no resources.xml file')
-    #         raise ex
-
-
     def _applySvgConfig(self, svg_str: str, custom_colors_dict: dict[str, str] | None = None):
         colors_dict = {
             'STROKE': 'white',
@@ -438,15 +372,18 @@ class ScreenPenWindow(QMainWindow):
 
         return parsed
 
+
     def _getIcon(self, name: str, custom_colors_dict: dict[str, str] | None = None):
         return QIcon(QtGui.QPixmap.fromImage(QtGui.QImage.fromData(bytes(self._applySvgConfig(self._icons[name], custom_colors_dict), encoding='utf-8'))))
+
 
     def _createCanvas(self):
         self.background: QImage = QtGui.QImage(self.size(), IMAGE_FORMATS['ARGB32'])
         self.imageDraw: QImage = QtGui.QImage(self.size(), IMAGE_FORMATS['ARGB32'])
         self.imageDraw_bck: QImage = QtGui.QImage(self.size(), IMAGE_FORMATS['ARGB32'])
         self._clearBackground()
-        
+    
+
     def _clearBackground(self): # make background transparent
         if self.transparent_background:
             self.background.fill(COLORS['transparent'])
@@ -456,21 +393,12 @@ class ScreenPenWindow(QMainWindow):
             _ = qp2.end()
         self.update()
 
+
     def _clearCanvas(self):
         self.imageDraw.fill(COLORS['transparent'])
         self.imageDraw_bck.fill(COLORS['transparent'])
         self.update()
 
-    # def drawMatplotlib(self, qp:QtGui.QPainter, canvas:FigureCanvas, p1:QtCore.QPoint):
-    #     size = canvas.size()
-    #     width, height = size.width(), size.height()
-    #     im = QtGui.QImage(canvas.buffer_rgba(), width, height, IMAGE_FORMATS['ARGB32']).rgbSwapped()
-    #     p2 = QtCore.QPoint(int(p1.x()+width), int(p1.y()+height))
-    #     qp.drawImage(QtCore.QRect(
-    #         p1, 
-    #         p2
-    #     ), im, im.rect())
-        
 
     def _setupTools(self):
         self.curr_br.setColor(self.curr_color)
@@ -480,12 +408,13 @@ class ScreenPenWindow(QMainWindow):
         self.curr_pen.setBrush(self.curr_br)
         self.curr_pen.setWidth(self.curr_width)
 
+
     def setColor(self, color: Color):
         def _setColor():
             self.curr_color = color
             if self.highlighting:
                 try:
-                    _ = self.curr_color.setAlpha(self.highlight_alpha)
+                    self.curr_color.setAlpha(self.highlight_alpha)
                     self.highlighting = True
                     
                 except:
@@ -499,7 +428,7 @@ class ScreenPenWindow(QMainWindow):
         def _setHighlight():
             if not self.highlighting:
                 try:
-                    _ = self.curr_color.setAlpha(self.highlight_alpha)
+                    self.curr_color.setAlpha(self.highlight_alpha)
                     self.highlighting = True
 
                 except:
@@ -507,7 +436,7 @@ class ScreenPenWindow(QMainWindow):
                 
             else:
                 try:
-                    _ = self.curr_color.setAlpha(255)
+                    self.curr_color.setAlpha(255)
                     self.highlighting = False
 
                 except:
@@ -516,6 +445,7 @@ class ScreenPenWindow(QMainWindow):
             self._setAction2('drawPath')
         return _setHighlight
     
+
     def _getEraserPen(self, color: Color = COLORS['transparent'], size: int = 30):
         pen = QtGui.QPen()
         pen.setBrush(QtGui.QBrush(color))
@@ -524,6 +454,7 @@ class ScreenPenWindow(QMainWindow):
         pen.setJoinStyle(PEN_JOIN_STYLES['roundJoin'])
         pen.setWidth(size)
         return pen
+
 
     def setEraser(self):
         def _setEraser():
@@ -555,6 +486,7 @@ class ScreenPenWindow(QMainWindow):
             self._setupTools()
         return _setEraser
 
+
     def setPenStyle(self, style: Qt.PenStyle):
         def _setStyle():
             self.curr_style = style
@@ -562,23 +494,27 @@ class ScreenPenWindow(QMainWindow):
 
         return _setStyle
 
+
     def setWidth(self, width: int):
         def _setWidth():
             self.curr_width = width
             self._setupTools()
         return _setWidth
     
+
     def increaseWidth(self):
         def _increaseWidth():
             self.curr_width += 2
             self._setupTools()
         return _increaseWidth
     
+
     def decreaseWidth(self):
         def _decreaseWidth():
             self.curr_width -= 2
             self._setupTools()
         return _decreaseWidth
+
 
     def setAction(self, action: str, cursor: str | Qt.CursorShape | QPixmap | None = None):
         def _setAction():
@@ -586,6 +522,7 @@ class ScreenPenWindow(QMainWindow):
             if cursor is None:
                 self._setCursor(CURSORS['arrow_cursor'])
         return _setAction
+
 
     def _setAction2(self, action: str, cursor: str | Qt.CursorShape | QPixmap | None = None):
         self.curr_method = action
@@ -670,6 +607,7 @@ class ScreenPenWindow(QMainWindow):
             self._clearCanvas()
         return _removeDrawing
 
+
     def captureScreen(self):
         for tb in self.toolBars:
             tb.hide()
@@ -686,12 +624,14 @@ class ScreenPenWindow(QMainWindow):
 
         return img
 
+    # TODO use pyscreenshot https://github.com/ponty/pyscreenshot to save drawing.
     def saveDrawing(self):
-        def _saveDrawing(n=0):
+        def _saveDrawing(_: int = 0):
             filename = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
             print(f'Saving {filename}')
             _ = self.captureScreen().save(f'{filename}')
         return _saveDrawing
+
 
     def colorPicker(self) -> Callable[[], None]:
         def _colorPicker():
@@ -702,6 +642,7 @@ class ScreenPenWindow(QMainWindow):
                 if self.highlighting:
                     self.curr_color.setAlpha(self.highlight_alpha)
         return _colorPicker
+
 
     def addNewAction(self, name: str, icon: QIcon, fun: Callable[[], None]):
         action = QAction(icon, name, self)
@@ -797,6 +738,7 @@ class ScreenPenWindow(QMainWindow):
         y_scale = canvas_size.height() / window_size.height()
         return QtCore.QPoint(int(coords.x()*x_scale), int(coords.y()*y_scale))
 
+    @override
     def paintEvent(self, a0: QPaintEvent | None):
         if a0 is not None:
             event = a0
@@ -838,21 +780,6 @@ class ScreenPenWindow(QMainWindow):
                 getattr(qp, self.curr_method)(*self.curr_args)
                 qp.setBrush(self.curr_br)
 
-            #elif self.curr_method in ['drawChart']:
-            #    qp.drawImage(self.imageDraw.rect(), self.imageDraw_bck, self.imageDraw_bck.rect())
-            #    try:
-            #        self.drawChart(qp, self.end)
-            #        self.update()
-            #    except Exception as ex:
-            #        self.drawing = False
-            #        msgBox = QtWidgets.QMessageBox()
-            #        msgBox.setText(str(ex))
-            #        msgBox.exec()
-            #        
-            #        self.curr_method = 'drawPath'
-            #        self.update()
-            #        return
-
             elif self.curr_method in ['drawPath']:
                 if self.lastPoint != self.end:
                     qp.setBrush(BRUSHES['no_brush'])
@@ -883,13 +810,15 @@ class ScreenPenWindow(QMainWindow):
         canvasPainter.setCompositionMode(COMPOSITION_MODE['source_over'])
         _ = canvasPainter.end()
 
-
+    
+    @override
     def mousePressEvent(self, a0: QMouseEvent | None):
         if a0 is not None:
             event = a0
         else:
             raise Exception("Invalid mouse event")
-            
+        
+        # TODO make the buttons use config values
         if event.button() == BUTTONS['right']:
             sys.exit(0)
 
@@ -914,6 +843,7 @@ class ScreenPenWindow(QMainWindow):
             self.lastPoint = self.scaleCoords(event.pos())
         self.update()
 
+    @override
     def mouseMoveEvent(self, a0: QMouseEvent | None):
         if a0 is not None:
             event = a0
@@ -962,6 +892,7 @@ class ScreenPenWindow(QMainWindow):
     def quit_program(self):
         sys.exit(0)
 
+    @override
     def mouseReleaseEvent(self, a0: QMouseEvent | None):
         if a0 is not None:
             event = a0
@@ -990,7 +921,7 @@ class ScreenPenWindow(QMainWindow):
 class ScreenshotError(Exception):
     pass
 
-def _get_screenshots_grim(screens: list[QScreen]):
+def _get_screenshots_grim(screens: list[QScreen]) -> list[tuple[QScreen, QRect, QPixmap]]:
     screenshots: list[tuple[QScreen, QRect, QPixmap]] = []
     for idx, screen in enumerate(screens):
         screen_geom = QGuiApplication.screens()[idx].geometry()
@@ -999,29 +930,32 @@ def _get_screenshots_grim(screens: list[QScreen]):
         w = screen_geom.width()
         h = screen_geom.height()
         
+        path = f'./~screen{idx}.png'
+
         try:
             _ = subprocess.run(
-                f'grim -g "{x},{y} {w}x{h}" "./~screen{idx}.png"', 
+                f'grim -g "{x},{y} {w}x{h}" \'{path}\'', 
                 check=True,
                 shell=True,
                 stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
             )
             
-            pixmap = QPixmap(f'./~screen{idx}.png')
+            pixmap = QPixmap(f'{path}')
             screenshots.append((
                 screen,
                 screen_geom,
                 pixmap
             ))
 
-        except subprocess.CalledProcessError:
-            raise ScreenshotError('Grim is not available')
+        except subprocess.CalledProcessError as err:
+            raise ScreenshotError(f'Err: Grim is not available {err}')
             
 #    for idx in range(len(screens)): # might not be needed.
         try:
-            os.remove(f'./~screen{idx}.png')        
+            os.remove(f'{path}')
+            
         except FileNotFoundError:
-            temp = os.path.abspath('./~screen{idx}.png')
+            temp = os.path.abspath(f'{path}')
             print(f"Could not delete file: {temp}.")
 
     return screenshots
@@ -1029,6 +963,13 @@ def _get_screenshots_grim(screens: list[QScreen]):
 
 def _grab_screen(screen_idx: int, screen: QScreen):
     screen_geom: QRect = QGuiApplication.screens()[screen_idx].geometry()
+
+    # temp = screen.grabWindow(
+    #         0, 
+    #         screen_geom.x(), 
+    #         screen_geom.y(), 
+    #         screen.size().width(), 
+    #         screen.size().height()
 
     return (
         screen_geom, 
@@ -1052,7 +993,7 @@ def _get_screenshots_pyqt(screens: list[QScreen]) -> list[tuple[QScreen, QRect, 
 
 def _get_screenshots_pillow(screens: list[QScreen]) -> list[tuple[QScreen, QRect, QPixmap]]:
     from PIL import ImageGrab, Image, UnidentifiedImageError
-    from time import sleep
+    #from time import sleep
     screenshots: list[tuple[QScreen, QRect, QPixmap]] = []
     for idx, screen in enumerate(screens):
         screen_geom = QGuiApplication.screens()[idx].geometry()
@@ -1066,8 +1007,8 @@ def _get_screenshots_pillow(screens: list[QScreen]) -> list[tuple[QScreen, QRect
                 xdisplay=""
             )
         
-        except UnidentifiedImageError as e:
-            raise ScreenshotError('Pillow problem')
+        except UnidentifiedImageError as err:
+            raise ScreenshotError(f'Pillow problem: {err}')
             #sleep(1)
             #try:
             #    img = [el for el in e.args[0].split("'") if el.endswith('.png')]#[0]
@@ -1077,8 +1018,8 @@ def _get_screenshots_pillow(screens: list[QScreen]) -> list[tuple[QScreen, QRect
             #except Exception as e:
             #    raise ScreenshotError('Pillow problem')
 
-        except Exception as e:
-            raise ScreenshotError('Pillow problem')
+        except Exception as err:
+            raise ScreenshotError(f'Pillow problem: {err}')
         
         img = img.convert('RGB')
         data = img.tobytes('raw', 'RGB')
@@ -1113,22 +1054,20 @@ def _get_screens(app: QApplication) -> list[tuple[QScreen, QRect, QPixmap]]:
         raise ScreenshotError('No screens found')
     
     try:
-        if _is_grim_installed():
-            temp =  _get_screenshots_grim(screens)
-            return temp
+        if _is_pillow_installed():
+            return _get_screenshots_pillow(screens)
         else:
-            raise ScreenshotError('Grim problem')
-    except ScreenshotError:
-        pass
+            raise ScreenshotError('Pillow problem: Pillow not installed.')
+    except ScreenshotError as err:
+        print(err)
 
     try:
-        if _is_pillow_installed():
-            temp = _get_screenshots_pillow(screens)
-            return temp
+        if _is_grim_installed():
+            return _get_screenshots_grim(screens)
         else:
-            raise ScreenshotError('Pillow problem')
-    except ScreenshotError:
-        pass
+            raise ScreenshotError('Grim problem: Grim not installed.')
+    except ScreenshotError as err:
+        print(err)
 
     try:
         screenshots = _get_screenshots_pyqt(app.screens())
@@ -1154,7 +1093,7 @@ def _is_transparency_supported():
         return False
 
 def _setPalette(app: QApplication):
-    palette = _create_palette()
+    palette = QPalette()
     _set_palette_color(palette, PALETTE_PROPS['window'], _get_color_from_RGB(53, 53, 53))
     _set_palette_color(palette, PALETTE_PROPS['windowText'], COLORS['white'])
     _set_palette_color(palette, PALETTE_PROPS['base'], _get_color_from_RGB(25, 25, 25))
@@ -1170,7 +1109,7 @@ def _setPalette(app: QApplication):
     _set_palette_color(palette, PALETTE_PROPS['highlightedText'], COLORS['black'])
     
     app.setPalette(palette)
-    app.setStyle("Fusion")
+    _ = app.setStyle("Fusion")
 
 
 def main():
@@ -1210,10 +1149,11 @@ def main():
     screen, screen_geom, pixmap = screens_data[screen_choice]
     
     use_transparency = args.transparent or _is_transparency_supported()
-    
+
     _ = ScreenPenWindow(screen=screen, screen_geom=screen_geom, pixmap=pixmap,
                              transparent_background=use_transparency, config_file=config_path)
     sys.exit(_execute_dialog(app))
+    #sys.exit(app.exec())
 
 
 class DrawingHistory():
@@ -1249,6 +1189,130 @@ class DrawingHistory():
         def len(self) -> int:
             return len(self.history)
 
+        def __getitem__(self, key: int) -> QPixmap:
+            try:
+                return self.history[-key]
+
+            except KeyError:
+                print(f"Error: Invalid key in history ({key})")
+                sys.exit(-2)
+
+
+class Configuration():
+    config_keys: dict[str, str] = {
+        "penbar_area": "str",
+        "boardbar_area": "str",
+        "actionbar_area": "str",
+        "hidden_menus": "bool",
+        "icon_size": "int",
+        "drawing_history": "int",
+        "default_pen_size": "int",
+        "undo_key": "str",
+        "redo_key": "str",
+        "toggle_menus_key": "str",
+        "exit_shortcut_key": "str",
+        "save_key": "str",
+        "clear_key": "str",
+        "decrease_width": "str",
+        "increase_width": "str",
+        "highlight_key": "str",
+        "exit_mouse": "str",
+        "toggle_menus_mouse": "str",
+        "drawing_mouse": "str"
+    }
+
+    __default_config: dict[str, str | bool | int] = {
+        "penbar_area": "topToolBarArea",
+        "boardbar_area": "topToolBarArea",
+        "actionbar_area": "leftToolBarArea",
+        "hidden_menus": False,
+        "icon_size": 25,
+        "drawing_history": 50,
+        "default_pen_size": 3,
+        "undo_key": "Ctrl+z",
+        "redo_key": "Ctrl+y",
+        "toggle_menus_key": "Ctrl+m",
+        "exit_shortcut_key": "Escape",
+        "save_key": "Ctrl+s",
+        "clear_key": "Ctrl+x",
+        "decrease_width": "[",
+        "increase_width": "]",
+        "highlight_key": "Ctrl+h",
+        "exit_mouse": "right",
+        "toggle_menus_mouse": "middle",
+        "drawing_mouse": "left"
+    }
+
+    def __init__(self, config_path: str | None = None) -> None:
+        self.config: dict[str, str | bool | int] = {}
+
+        default_config_path = os.path.join(os.environ["XDG_CONFIG_HOME"], "screenpenrc")
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+
+        if config_path is not None:
+            config_ini_path = config_path
+
+        elif os.path.exists(default_config_path):
+            config_ini_path = default_config_path
+        
+        else:
+            from shutil import copyfile
+            from shutil import SameFileError, SpecialFileError
+            packaged_conf_path = os.path.join(dir_path, "utils", "screenpenrc")
+            try:
+                _ = copyfile(packaged_conf_path, default_config_path, follow_symlinks=False)
+                print(f"Added default config file to {default_config_path}.")
+                config_ini_path = default_config_path
+            
+            except (SameFileError, SpecialFileError, FileNotFoundError):
+                print("Using default configuration.")
+                config_ini_path = "**default**"
+
+        self.config_path: str = config_ini_path
+
+        self.build_config()
+        
+    
+    def build_config(self):
+        if self.config_path == "**default**":
+            self.config = self.__default_config
+            return
+
+        config = configparser.ConfigParser()
+        _ = config.read(self.config_path)
+
+        for key, item in self.config_keys.items():
+            match item:
+                case "bool":
+                    temp = config['screenpen'].getboolean(key)
+                    if temp is None:
+                        temp = self.__default_config[key]
+                    self.config[key] = temp
+                
+                case "int":
+                    temp = config['screenpen'].getint(key)
+                    if temp is None:
+                        temp = self.__default_config[key]
+                    self.config[key] = temp
+
+                case "str":
+                    temp = config['screenpen'].get(key)
+                    if temp is None:
+                        temp = self.__default_config[key]
+                    self.config[key] = temp
+                
+                case _:
+                    raise Exception("Error in parsing config. Nonexistant key type.")
+        
+        return
+
+    
+    def __getitem__(self, key: str) -> str | bool | int:
+        try:
+            return self.config[key]
+        except KeyError:
+            print(f"Error: Invalid key in configuration ({key})")
+            sys.exit(-2)
 
 if __name__ == '__main__':
     main()

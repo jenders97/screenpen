@@ -1,0 +1,25 @@
+[screenpen]
+; Possible values for areas: topToolBarArea, bottomToolBarArea, leftToolBarArea, rightToolBarArea
+penbar_area = topToolBarArea
+boardbar_area = topToolBarArea
+actionbar_area = leftToolBarArea
+hidden_menus = False
+icon_size = 25
+drawing_history = 50
+
+; Shortcuts
+undo_key = Ctrl+z
+redo_key = Ctrl+y
+toggle_menus_key = Ctrl+m
+exit_shortcut_key = Escape
+save_key = Ctrl+s
+clear_key = Ctrl+x
+decrease_width = "["
+increase_width = "]"
+highlight_key = Ctrl+h
+
+
+; Mouse buttons
+exit_mouse = right
+toggle_menus_mouse = middle
+drawing_mouse = left

@@ -1,18 +1,16 @@
 import io
 from setuptools import setup, find_packages
 
-version = {}
-exec(open("screenpen/version.py").read(), version)  # pylint: disable=exec-used
-print(version)
+version = "0.1.0"
 
 def get_requirements():
     with open("requirements.txt") as fp:
         return [req for req in (line.strip() for line in fp) if req and not req.startswith("#")]
 
 
-setup(
+_ = setup(
     name="screenpen",
-    version=version["__version__"],
+    version=version,
     author="Robert Susik",
     author_email="robert.susik@gmail.com",
     options={"bdist_wheel": {"universal": True}},    
