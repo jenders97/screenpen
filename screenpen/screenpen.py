@@ -288,7 +288,7 @@ class ScreenPenWindow(QMainWindow):
         _ = self.sc_save_drawing.activated.connect(self.saveDrawing())
         self.sc_decrease_width: QShortcut = QShortcut(QKeySequence(str(self.config["decrease_width"])), self)
         _ = self.sc_decrease_width.activated.connect(self.decreaseWidth())
-        self.sc_increase_width: QShortcut = QShortcut(QKeySequence(str("]")), self) #self.config["increase_width"])), self)
+        self.sc_increase_width: QShortcut = QShortcut(QKeySequence(str(self.config["increase_width"])), self)
         _ = self.sc_increase_width.activated.connect(self.increaseWidth())
         self.sc_highlight: QShortcut = QShortcut(QKeySequence(str(self.config["highlight_key"])), self)
         _ = self.sc_highlight.activated.connect(self.setHighlight())
@@ -512,6 +512,9 @@ class ScreenPenWindow(QMainWindow):
     def decreaseWidth(self):
         def _decreaseWidth():
             self.curr_width -= 2
+            if self.curr_width < 0: # Don't go below the min pen size.
+                self.curr_width = 0
+            
             self._setupTools()
         return _decreaseWidth
 
