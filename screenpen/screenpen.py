@@ -13,6 +13,7 @@ import sys
 import os
 import configparser
 import platform
+import psutil
 
 from xml.dom import minidom
 from collections.abc import Iterable
@@ -179,28 +180,7 @@ DIALOG_BUTTONS = {
     'cancel': QDialogButtonBox.StandardButton.Cancel,
 }
         
-
-# import numpy as np
-
-# import importlib
-
-#from matplotlib.backends.qt_compat import QtCore,#QtCore, QtWidgets
-#if QtCore.qVersion() >= "5.":
-#    from matplotlib.backends.backend_qtagg import (
-#        FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar)
-#else:
-#    from matplotlib.backends.backend_qt4agg import (
-#        FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
-#from matplotlib.figure import Figure
-
 __version__ = "0.3.3"
-
-# dir_path = os.path.dirname(os.path.realpath(__file__))
-# syntax_py_path = f'{dir_path}/utils/syntax.py'
-# spec = importlib.util.spec_from_file_location('syntax', syntax_py_path)
-# syntax = importlib.util.module_from_spec(spec)
-# sys.modules['syntax'] = syntax
-# spec.loader.exec_module(syntax)
 
 class ScreenPenWindow(QMainWindow):
     def __init__(self, screen: QScreen, screen_geom: QRect, pixmap: QtGui.QPixmap | None = None, transparent_background: bool = True,
@@ -414,7 +394,8 @@ class ScreenPenWindow(QMainWindow):
             self.curr_color = color
             if self.highlighting:
                 try:
-                    self.curr_color.setAlpha(self.highlight_alpha)
+                    # Try to set the alpha. Fail silently, if not possible.
+                    _ = self.curr_color.setAlpha(self.highlight_alpha)
                     self.highlighting = True
                     
                 except:
@@ -428,7 +409,8 @@ class ScreenPenWindow(QMainWindow):
         def _setHighlight():
             if not self.highlighting:
                 try:
-                    self.curr_color.setAlpha(self.highlight_alpha)
+                    # Try to set the alpha. Fail silently, if not possible.
+                    _ = self.curr_color.setAlpha(self.highlight_alpha)
                     self.highlighting = True
 
                 except:
@@ -436,7 +418,8 @@ class ScreenPenWindow(QMainWindow):
                 
             else:
                 try:
-                    self.curr_color.setAlpha(255)
+                    # Try to set the alpha. Fail silently, if not possible.
+                    _ = self.curr_color.setAlpha(255)
                     self.highlighting = False
 
                 except:
@@ -765,7 +748,6 @@ class ScreenPenWindow(QMainWindow):
                 qp.setBrush(BRUSHES['no_brush'])
                 self.curr_args = [QRect(self.begin, self.end)]
                 qp.drawImage(self.imageDraw.rect(), self.imageDraw_bck, self.imageDraw_bck.rect())
-                #
                 
                 getattr(qp, self.curr_method)(*self.curr_args)
                 qp.setBrush(self.curr_br)
@@ -1119,12 +1101,12 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('-v', '--version', dest='version', action='version', version=f'Version: {__version__}')
-    parser.add_argument('-1', nargs='?', type=int, dest='screen', const='0')
-    parser.add_argument('-2', nargs='?', type=int, dest='screen', const='1')
-    parser.add_argument('-3', nargs='?', type=int, dest='screen', const='2')
-    parser.add_argument('-t', '--transparent', dest='transparent', help='Force transparent background. If you are sure your WM support it.', action='store_true')
-    parser.add_argument('-c', '--config', type=str, dest='config', help='Path to config file', default='')
+    _ = parser.add_argument('-v', '--version', dest='version', action='version', version=f'Version: {__version__}')
+    _ = parser.add_argument('-1', nargs='?', type=int, dest='screen', const='0')
+    _ = parser.add_argument('-2', nargs='?', type=int, dest='screen', const='1')
+    _ = parser.add_argument('-3', nargs='?', type=int, dest='screen', const='2')
+    _ = parser.add_argument('-t', '--transparent', dest='transparent', help='Force transparent background. If you are sure your WM support it.', action='store_true')
+    _ = parser.add_argument('-c', '--config', type=str, dest='config', help='Path to config file', default='')
 
     args = parser.parse_args()
 
@@ -1156,7 +1138,6 @@ def main():
     _ = ScreenPenWindow(screen=screen, screen_geom=screen_geom, pixmap=pixmap,
                              transparent_background=use_transparency, config_file=config_path)
     sys.exit(_execute_dialog(app))
-    #sys.exit(app.exec())
 
 
 class DrawingHistory():
@@ -1317,5 +1298,21 @@ class Configuration():
             print(f"Error: Invalid key in configuration ({key})")
             sys.exit(-2)
 
+
+def check_already_running():
+    curr_proc = psutil.Process()
+    curr_command = curr_proc.cmdline()
+    for proc in psutil.process_iter():
+        try:
+            temp_command = proc.cmdline()
+
+        except psutil.ZombieProcess:
+            continue
+        
+        if curr_command == temp_command and proc.pid != curr_proc.pid:
+            sys.exit(-3)
+
+
 if __name__ == '__main__':
+    check_already_running()
     main()
